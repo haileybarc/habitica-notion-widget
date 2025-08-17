@@ -27,53 +27,41 @@ async function main() {
     const outDir = path.join(process.cwd(), "public");
     fs.mkdirSync(outDir, { recursive: true });
     fs.writeFileSync(
-      path.join(outDir, "level.json"),
-      JSON.stringify({
-        schemaVersion: 1,
-        label: "Habitica",
-        message: `API error (${res.status})`,
-        color: "red",
-      })
+      path.join(outDir, "status.svg"),
+      `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="50">
+         <rect width="200" height="50" fill="red"/>
+         <text x="10" y="30" fill="white">Habitica API Error</text>
+       </svg>`
     );
-    console.error("Habitica API error:", res.status, await res.text());
-    process.exit(0);
+    process.exit(1);
   }
 
-  const json = await res.json();
-  const stats = json.data.stats;
+  const data = await res.json();
 
-  const lvl = stats.lvl;
-  const exp = stats.exp || 0;
-  const toNext = stats.toNextLevel || 1;
-  const pct = Math.max(0, Math.min(100, Math.round((exp / toNext) * 100)));
+  // Grab XP bar data
+  const stats = data.data.stats;
+  const xp = stats.exp;
+  const toNext = stats.toNextLevel;
 
-  const badge = {
-    schemaVersion: 1,
-    label: "Habitica",
-    message: `Level ${lvl} • ${pct}% XP`,
-    color: "purple",
-  };
+  const progress = Math.min(100, Math.round((xp / toNext) * 100));
+
+  // Simple SVG progress bar
+  const svg = `
+  <svg xmlns="http://www.w3.org/2000/svg" width="300" height="50">
+    <rect width="300" height="50" fill="#333"/>
+    <rect width="${3 * progress}" height="50" fill="#4caf50"/>
+    <text x="150" y="30" fill="white" text-anchor="middle" font-size="16">
+      XP: ${xp} / ${toNext} (${progress}%)
+    </text>
+  </svg>
+  `;
 
   const outDir = path.join(process.cwd(), "public");
   fs.mkdirSync(outDir, { recursive: true });
-
-  fs.writeFileSync(
-    path.join(outDir, "level.json"),
-    JSON.stringify(badge)
-  );
-
-  const page = `<!doctype html>
-  <meta charset="utf-8">
-  <title>Habitica Badge</title>
-  <h1>Habitica Badge (Lily)</h1>
-  <img src="https://img.shields.io/endpoint?url=https://${process.env.GITHUB_REPOSITORY_OWNER}.github.io/${process.env.GITHUB_REPOSITORY.split("/")[1]}/level.json" alt="Habitica Badge">`;
-
-  fs.writeFileSync(path.join(outDir, "index.html"), page);
-
-  console.log("✅ Generated public/level.json and public/index.html");
+  fs.writeFileSync(path.join(outDir, "status.svg"), svg);
 }
 
-main().catch((e) => {
-  console.error(e);
+main().catch((err) => {
+  console.error(err);
   process.exit(1);
 });

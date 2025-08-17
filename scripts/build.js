@@ -12,30 +12,41 @@ if (!USER || !TOKEN) {
 }
 
 async function main() {
-  // Get current user stats
   const res = await fetch("https://habitica.com/api/v3/user", {
     headers: {
       "x-api-user": USER,
       "x-api-key": TOKEN,
+      "x-client": "haileybarc-habitica-notion-widget", // required header
+      "user-agent": "haileybarc-habitica-notion-widget/1.0",
       "content-type": "application/json",
     },
   });
 
   if (!res.ok) {
+    // Write a fallback badge so deploy still works
+    const outDir = path.join(process.cwd(), "public");
+    fs.mkdirSync(outDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(outDir, "level.json"),
+      JSON.stringify({
+        schemaVersion: 1,
+        label: "Habitica",
+        message: `API error (${res.status})`,
+        color: "red",
+      })
+    );
     console.error("Habitica API error:", res.status, await res.text());
-    process.exit(1);
+    process.exit(0);
   }
 
   const json = await res.json();
   const stats = json.data.stats;
 
   const lvl = stats.lvl;
-  const cls = stats.class || "";
   const exp = stats.exp || 0;
   const toNext = stats.toNextLevel || 1;
   const pct = Math.max(0, Math.min(100, Math.round((exp / toNext) * 100)));
 
-  // Shields.io "endpoint" schema
   const badge = {
     schemaVersion: 1,
     label: "Habitica",
@@ -43,23 +54,23 @@ async function main() {
     color: "purple",
   };
 
-  // Ensure output dir
   const outDir = path.join(process.cwd(), "public");
   fs.mkdirSync(outDir, { recursive: true });
 
-  // Write JSON for Shields
-  fs.writeFileSync(path.join(outDir, "level.json"), JSON.stringify(badge));
+  fs.writeFileSync(
+    path.join(outDir, "level.json"),
+    JSON.stringify(badge)
+  );
 
-  // Optional: a tiny landing page (nice for testing)
   const page = `<!doctype html>
   <meta charset="utf-8">
   <title>Habitica Badge</title>
   <h1>Habitica Badge (Lily)</h1>
-  <img src="https://img.shields.io/endpoint?url=${`https://` + process.env.GITHUB_REPOSITORY_OWNER + `.github.io/` + process.env.GITHUB_REPOSITORY.split("/")[1]}/level.json" alt="Habitica Badge">
-  <p>Embed this in Notion using /embed → the Shields URL above.</p>`;
+  <img src="https://img.shields.io/endpoint?url=https://${process.env.GITHUB_REPOSITORY_OWNER}.github.io/${process.env.GITHUB_REPOSITORY.split("/")[1]}/level.json" alt="Habitica Badge">`;
+
   fs.writeFileSync(path.join(outDir, "index.html"), page);
 
-  console.log("Generated public/level.json and public/index.html");
+  console.log("✅ Generated public/level.json and public/index.html");
 }
 
 main().catch((e) => {
